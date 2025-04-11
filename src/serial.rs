@@ -150,7 +150,7 @@ impl Read for SerialConnection {
             match self.port.bytes_to_read() {
                 Ok(bytes) => {
                     if bytes > 0 {
-                        let _ = match self.port.read(buf) {
+                        match self.port.read(buf) {
                             Ok(bytes_read) => {
                                 if bytes_read > 0 {
                                     return Ok(bytes_read);
