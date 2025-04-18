@@ -37,7 +37,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
     - name: Check with clippy
-      run: cargo clippy --all-targets --all-features
+      run: cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Build
       run: cargo build --verbose
