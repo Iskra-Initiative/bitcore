@@ -71,7 +71,9 @@ impl Drop for SocatManager {
 }
 
 /// initialize tracing for tests
+#[allow(clippy::single_component_path_imports)]
 fn init_tracing() {
+    use tracing_subscriber;
     let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .try_init();
