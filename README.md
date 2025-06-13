@@ -1,8 +1,6 @@
 # bitcore
 
-currently used for [**bit**](https://github.com/dgtlrst/bit) backend
-
-`bitcore` is also generic. It provides an API to a serial driver implementation, which can be used for any project, which requires serial communication.
+`bitcore` is generic. It provides an API to a serial driver implementation, which can be used for any project, which requires serial communication.
 
 - **interface**
   - provides a public API to a serial driver implementation

@@ -1,7 +1,5 @@
-// -- public API
-// exposes the API to external code
-
+/// public api
 pub mod api;
 pub mod serial;
 
-pub use api::{connect, disconnect, list, read, write};
+pub use api::{connect, disconnect, flush, list, read, write};

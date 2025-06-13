@@ -185,3 +185,26 @@ pub fn read(
         }
     }
 }
+
+/// flush serial port
+///
+/// @param shared_conn: &SharedConnection - shared connection object
+///
+/// @return io::Result<()> - result of the operation
+pub fn flush(shared_conn: &SharedConnection) -> io::Result<()> {
+    let mut conn_lock = lock_connection(shared_conn)?;
+
+    match conn_lock.as_mut() {
+        Some(conn) => {
+            info!("[core] flushing");
+            conn.flush()
+        }
+        None => {
+            warn!("[core] attempted flush on a non-existing connection");
+            Err(io::Error::new(
+                io::ErrorKind::NotConnected,
+                "[core] no connection",
+            ))
+        }
+    }
+}
