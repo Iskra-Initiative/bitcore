@@ -34,19 +34,19 @@ pub enum BitcoreError {
 impl fmt::Display for BitcoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BitcoreError::SerialPort(e) => write!(f, "serial port error: {}", e),
-            BitcoreError::Io(e) => write!(f, "io error: {}", e),
+            BitcoreError::SerialPort(e) => write!(f, "serial port error: {e}"),
+            BitcoreError::Io(e) => write!(f, "io error: {e}"),
             BitcoreError::NotConnected => write!(f, "connection not established"),
             BitcoreError::AlreadyConnected => write!(f, "connection already exists"),
-            BitcoreError::LockFailed(msg) => write!(f, "lock acquisition failed: {}", msg),
+            BitcoreError::LockFailed(msg) => write!(f, "lock acquisition failed: {msg}"),
             BitcoreError::Timeout { timeout_ms } => {
-                write!(f, "operation timed out after {}ms", timeout_ms)
+                write!(f, "operation timed out after {timeout_ms}ms")
             }
             BitcoreError::RetryLimitExceeded { attempts } => {
-                write!(f, "retry limit exceeded: {} attempts failed", attempts)
+                write!(f, "retry limit exceeded: {attempts} attempts failed")
             }
             BitcoreError::InvalidParameter { param, reason } => {
-                write!(f, "invalid parameter {}: {}", param, reason)
+                write!(f, "invalid parameter {param}: {reason}")
             }
         }
     }

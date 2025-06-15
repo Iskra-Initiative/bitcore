@@ -108,12 +108,12 @@ impl SerialPort for SerialConnection {
         self.port.set_timeout(timeout)
     }
 
-    fn write_request_to_send(&mut self, _data: bool) -> serialport::Result<()> {
-        self.port.write_request_to_send(_data)
+    fn write_request_to_send(&mut self, data: bool) -> serialport::Result<()> {
+        self.port.write_request_to_send(data)
     }
 
-    fn write_data_terminal_ready(&mut self, _data: bool) -> serialport::Result<()> {
-        self.port.write_data_terminal_ready(_data)
+    fn write_data_terminal_ready(&mut self, data: bool) -> serialport::Result<()> {
+        self.port.write_data_terminal_ready(data)
     }
 
     fn read_clear_to_send(&mut self) -> serialport::Result<bool> {
@@ -178,19 +178,15 @@ impl Read for SerialConnection {
                             }
                             Err(e) => {
                                 error!("error reading bytes: {}", e);
-                                return Err(io::Error::other(format!(
-                                    "error reading bytes: {}",
-                                    e
-                                )));
+                                return Err(io::Error::other(format!("error reading bytes: {e}")));
                             }
-                        };
+                        }
                     }
                 }
                 Err(e) => {
                     error!("error checking bytes to read: {}", e);
                     return Err(io::Error::other(format!(
-                        "error checking bytes to read: {}",
-                        e
+                        "error checking bytes to read: {e}"
                     )));
                 }
             }

@@ -45,8 +45,14 @@ impl RetryConfig {
     }
 
     /// calculate delay for given attempt number
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     pub fn delay_for_attempt(&self, attempt: usize) -> Duration {
-        if self.backoff_multiplier == 1.0 {
+        if (self.backoff_multiplier - 1.0).abs() < f32::EPSILON {
             self.retry_delay
         } else {
             let multiplier = self.backoff_multiplier.powi(attempt as i32);

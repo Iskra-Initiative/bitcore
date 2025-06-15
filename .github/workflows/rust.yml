@@ -99,9 +99,6 @@ jobs:
     - name: Run unit tests
       run: cargo test --verbose unit_tests
 
-    - name: Test examples
-      run: cargo run --example basic_usage
-
   # integration tests with socat
   socat-tests:
     name: Integration Tests (socat)

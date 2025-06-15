@@ -189,7 +189,7 @@ impl Serial {
             Ok(())
         } else {
             Err(BitcoreError::Timeout {
-                timeout_ms: self.config.timeout.as_millis() as u64,
+                timeout_ms: self.config.timeout.as_millis().min(u64::MAX as u128) as u64,
             })
         }
     }
@@ -235,7 +235,7 @@ impl Serial {
 
         if line.is_empty() && start_time.elapsed() >= self.config.timeout {
             Err(BitcoreError::Timeout {
-                timeout_ms: self.config.timeout.as_millis() as u64,
+                timeout_ms: self.config.timeout.as_millis().min(u64::MAX as u128) as u64,
             })
         } else {
             Ok(line)
