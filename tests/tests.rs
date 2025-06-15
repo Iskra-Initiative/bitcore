@@ -64,7 +64,7 @@ mod unit_tests {
 
         // test with custom config should also fail gracefully
         let config = SerialConfig::new(115200);
-        let result = Serial::with_config("/dev/nonexistent_port_12345", config);
+        let result = Serial::with_config("/dev/nonexistent_port_12345", &config);
         assert!(result.is_err());
     }
 
@@ -114,5 +114,46 @@ mod unit_tests {
         assert_eq!(config.parity, serialport::Parity::None);
         assert_eq!(config.stop_bits, serialport::StopBits::One);
         assert_eq!(config.flow_control, serialport::FlowControl::None);
+    }
+
+    #[test]
+    fn test_user_use_case_with_reference() {
+        init_tracing();
+
+        // Test the user's use case: storing config and passing &config to with_config
+        pub struct UartDriver {
+            pub config: SerialConfig,
+            pub stats: UartStats,
+        }
+
+        pub struct UartStats {
+            pub tx: u32,
+            pub rx: u32,
+        }
+
+        impl UartDriver {
+            pub fn new(config: SerialConfig) -> Self {
+                Self {
+                    config,
+                    stats: UartStats { tx: 0, rx: 0 },
+                }
+            }
+
+            fn connect(&self, port_name: &str) -> Result<Serial, Box<dyn std::error::Error>> {
+                // This should now work with &self.config!
+                let serial = Serial::with_config(port_name, &self.config)?;
+                Ok(serial)
+            }
+        }
+
+        let config = SerialConfig::new(115200)
+            .timeout(Duration::from_millis(500))
+            .retries(3);
+
+        let driver = UartDriver::new(config);
+
+        // This should compile and fail gracefully (port doesn't exist)
+        let result = driver.connect("/dev/nonexistent_test_port");
+        assert!(result.is_err());
     }
 }

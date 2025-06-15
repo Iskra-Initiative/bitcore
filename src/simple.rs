@@ -20,7 +20,8 @@ use tracing::{debug, info, warn};
 /// simple serial connection that handles everything automatically
 pub struct Serial {
     connection: Arc<Mutex<Option<SerialConnection>>>,
-    config: SerialConfig,
+    timeout: Duration,
+    retries: usize,
 }
 
 /// simplified configuration for serial connections
@@ -74,11 +75,11 @@ impl SerialConfig {
 impl Serial {
     /// create a new serial connection
     pub fn new<P: AsRef<str>>(port: P) -> Result<Self> {
-        Self::with_config(port, SerialConfig::default())
+        Self::with_config(port, &SerialConfig::default())
     }
 
     /// create a serial connection with custom configuration
-    pub fn with_config<P: AsRef<str>>(port: P, config: SerialConfig) -> Result<Self> {
+    pub fn with_config<P: AsRef<str>>(port: P, config: &SerialConfig) -> Result<Self> {
         let port_builder = serialport::new(port.as_ref(), config.baud_rate)
             .data_bits(config.data_bits)
             .parity(config.parity)
@@ -93,7 +94,8 @@ impl Serial {
 
         Ok(Self {
             connection: Arc::new(Mutex::new(Some(connection))),
-            config,
+            timeout: config.timeout,
+            retries: config.retries,
         })
     }
 
@@ -122,7 +124,7 @@ impl Serial {
                             debug!("wrote {} bytes", size);
                             return Ok(size);
                         }
-                        Err(e) if attempts < self.config.retries => {
+                        Err(e) if attempts < self.retries => {
                             warn!("write attempt {} failed: {}", attempts + 1, e);
                             attempts += 1;
                             std::thread::sleep(Duration::from_millis(10));
@@ -151,7 +153,7 @@ impl Serial {
         match conn_lock.as_mut() {
             Some(conn) => {
                 // set timeout
-                if let Err(e) = conn.set_timeout(self.config.timeout) {
+                if let Err(e) = conn.set_timeout(self.timeout) {
                     warn!("failed to set timeout: {}", e);
                 }
 
@@ -172,7 +174,7 @@ impl Serial {
         let mut total_read = 0;
         let start_time = std::time::Instant::now();
 
-        while total_read < buffer.len() && start_time.elapsed() < self.config.timeout {
+        while total_read < buffer.len() && start_time.elapsed() < self.timeout {
             match self.read(&mut buffer[total_read..]) {
                 Ok(0) => {
                     // no data available, continue
@@ -189,7 +191,7 @@ impl Serial {
             Ok(())
         } else {
             Err(BitcoreError::Timeout {
-                timeout_ms: self.config.timeout.as_millis().min(u64::MAX as u128) as u64,
+                timeout_ms: self.timeout.as_millis().min(u64::MAX as u128) as u64,
             })
         }
     }
@@ -205,7 +207,7 @@ impl Serial {
         let mut buffer = [0u8; 1];
         let start_time = std::time::Instant::now();
 
-        while start_time.elapsed() < self.config.timeout {
+        while start_time.elapsed() < self.timeout {
             match self.read(&mut buffer) {
                 Ok(1) => {
                     let ch = buffer[0] as char;
@@ -233,9 +235,9 @@ impl Serial {
             }
         }
 
-        if line.is_empty() && start_time.elapsed() >= self.config.timeout {
+        if line.is_empty() && start_time.elapsed() >= self.timeout {
             Err(BitcoreError::Timeout {
-                timeout_ms: self.config.timeout.as_millis().min(u64::MAX as u128) as u64,
+                timeout_ms: self.timeout.as_millis().min(u64::MAX as u128) as u64,
             })
         } else {
             Ok(line)

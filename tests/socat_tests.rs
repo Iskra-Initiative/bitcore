@@ -85,7 +85,7 @@ fn create_test_connection(port: &str) -> Result<Serial, Box<dyn std::error::Erro
         .timeout(Duration::from_millis(100))
         .retries(3);
 
-    let serial = Serial::with_config(port, config)?;
+    let serial = Serial::with_config(port, &config)?;
     Ok(serial)
 }
 
@@ -187,7 +187,7 @@ mod socat_integration_tests {
         let config = SerialConfig::new(115200)
             .timeout(Duration::from_millis(200))
             .retries(3);
-        let conn1 = Serial::with_config(socat.port1(), config).expect("failed to connect");
+        let conn1 = Serial::with_config(socat.port1(), &config).expect("failed to connect");
 
         // test read timeout when no data is available
         let mut buffer = [0u8; 64];

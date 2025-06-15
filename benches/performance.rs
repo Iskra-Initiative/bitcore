@@ -78,7 +78,7 @@ fn create_benchmark_connection(port: &str) -> Result<Serial, Box<dyn std::error:
         .timeout(Duration::from_millis(100))
         .retries(3);
 
-    let serial = Serial::with_config(port, config)?;
+    let serial = Serial::with_config(port, &config)?;
     Ok(serial)
 }
 
@@ -339,7 +339,7 @@ fn benchmark_serial_operations(c: &mut Criterion) {
             .timeout(Duration::from_millis(1))
             .retries(1);
         let timeout_conn =
-            Serial::with_config(socat.port2(), timeout_config).expect("failed to connect");
+            Serial::with_config(socat.port2(), &timeout_config).expect("failed to connect");
 
         b.iter(|| {
             let mut buffer = [0u8; 64];
