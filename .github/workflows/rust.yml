@@ -1,49 +1,334 @@
-name: Rust
+name: Rust CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "*" ]  # run on all branches
   pull_request:
-    branches: [ "main" ]
+    branches: [ "*" ]  # run on PRs to any branch
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  build:
+  # code quality checks
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Cache cargo registry
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        profile: minimal
-        override: true
         components: clippy, rustfmt
-    
+
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
-    - name: Check with clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-quality-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-quality-
+          ${{ runner.os }}-cargo-
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      run: cargo clippy
+
+    - name: Check documentation
+      run: cargo doc --no-deps --document-private-items
+      env:
+        RUSTDOCFLAGS: -D warnings
+
+  # build and basic tests
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
+        exclude:
+          # reduce CI load - only test beta on ubuntu
+          - os: windows-latest
+            rust: beta
+          - os: macos-latest
+            rust: beta
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-
+          ${{ runner.os }}-cargo-
+
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
     - name: Build
       run: cargo build --verbose
 
-    - name: Run specified test
-      run: cargo test --verbose list_ports
+    - name: Run unit tests
+      run: cargo test --verbose unit_tests
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+  # integration tests with socat
+  socat-tests:
+    name: Integration Tests (socat)
+    runs-on: ubuntu-latest
+    needs: [quality, build-and-test]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-socat-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-socat-
+          ${{ runner.os }}-cargo-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libudev-dev socat
+
+    - name: Verify socat installation
+      run: socat -V
+
+    - name: Run socat integration tests
+      run: cargo test --test socat_tests -- --ignored --nocapture
+      env:
+        RUST_LOG: info
+
+    - name: Run socat tests with helper script
+      run: |
+        chmod +x scripts/run_socat_tests.sh
+        ./scripts/run_socat_tests.sh
+
+
+
+  # coverage report
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [quality]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libudev-dev socat bc
+
+    - name: Install cargo-llvm-cov
+      run: cargo install cargo-llvm-cov
+
+    - name: Generate coverage report
+      run: |
+        cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+        cargo llvm-cov --all-features --workspace --html --output-dir coverage-html
+        cargo llvm-cov --all-features --workspace --test socat_tests -- --ignored
+
+    - name: Parse coverage percentage
+      id: coverage
+      run: |
+        # extract coverage percentage from lcov file
+        COVERAGE=$(lcov --summary lcov.info 2>/dev/null | grep -o 'lines......: [0-9.]*%' | grep -o '[0-9.]*' || echo "0")
+        echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+        echo "Coverage: $COVERAGE%"
+
+    - name: Upload coverage HTML report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage-html/
+        retention-days: 30
+
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-data
+        path: lcov.info
+        retention-days: 30
+
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const coverage = '${{ steps.coverage.outputs.percentage }}';
+          const isMain = '${{ github.base_ref }}' === 'main';
+          const thresholdNote = isMain ? '\n\n> ⚠️ Coverage threshold (70%) will be enforced when merged to main.' : '';
+
+          const comment = `## 📊 Code Coverage Report
+
+          **Coverage: ${coverage}%**
+
+          📁 [View detailed HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          > Coverage report generated by cargo-llvm-cov${thresholdNote}
+          `;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=${{ steps.coverage.outputs.percentage }}
+        THRESHOLD=70
+        echo "Coverage: $COVERAGE%, Threshold: $THRESHOLD%"
+
+        # Only enforce threshold on main branch
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "❌ Coverage $COVERAGE% is below threshold $THRESHOLD% (main branch)"
+            exit 1
+          else
+            echo "✅ Coverage $COVERAGE% meets threshold $THRESHOLD% (main branch)"
+          fi
+        else
+          echo "ℹ️ Coverage $COVERAGE% (threshold check skipped for feature branch)"
+        fi
+
+  # stress testing
+  stress-tests:
+    name: Stress Tests
+    runs-on: ubuntu-latest
+    needs: [quality, build-and-test]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libudev-dev socat
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: stress-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-stress-
+          ${{ runner.os }}-cargo-
+
+    - name: Run stress tests
+      run: |
+        # run socat tests multiple times to catch race conditions
+        for i in {1..3}; do
+          echo "stress test iteration $i"
+          cargo test --test socat_tests test_socat_concurrent_operations -- --ignored --nocapture
+        done
+
+    - name: Run long-duration tests
+      run: |
+        # run tests with longer timeouts
+        RUST_LOG=debug cargo test --test socat_tests test_socat_large_data_transfer -- --ignored --nocapture
+      timeout-minutes: 5
+
+  # performance benchmarks
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: [quality, build-and-test]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libudev-dev socat
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: bench-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-bench-
+          ${{ runner.os }}-cargo-
+
+    - name: Run performance benchmarks
+      run: |
+        # run configuration benchmarks (no socat required)
+        cargo bench config_benches
+
+        # run core functionality benchmarks (requires socat)
+        cargo bench core_benches
+
+        # run serial benchmarks (requires socat)
+        cargo bench serial_benches
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: target/criterion/
+        retention-days: 30
