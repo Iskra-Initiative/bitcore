@@ -2,8 +2,8 @@
 name = "bitcore"
 version = "0.1.0"
 edition = "2021"
-description = "Simple, fast, and reliable serial communication for Rust"
-license = "MIT OR Apache-2.0"
+description = "simple serial communication driver"
+license = ""
 keywords = ["serial", "communication", "embedded", "hardware"]
 categories = ["embedded", "hardware-support"]
 readme = "README.md"
@@ -15,7 +15,7 @@ tracing = { version = "0.1", default-features = false }
 [dev-dependencies]
 tracing-subscriber = "0.3"
 tempfile = "3.8"
-criterion = "0.5"
+criterion = "0.6.0"
 
 [[bench]]
 name = "performance"
