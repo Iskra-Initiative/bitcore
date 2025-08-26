@@ -18,6 +18,7 @@ use std::time::Duration;
 use tracing::{debug, info, warn};
 
 /// simple serial connection that handles everything automatically
+#[derive(Clone)]
 pub struct Serial {
     connection: Arc<Mutex<Option<SerialConnection>>>,
     timeout: Duration,
@@ -87,8 +88,10 @@ impl Serial {
             .flow_control(config.flow_control)
             .timeout(config.timeout);
 
+        println!("BEFORE CONNECTION");
         let connection = SerialConnection::connect(port_builder)
             .map_err(|e| BitcoreError::SerialPort(e.into()))?;
+        println!("AFTER CONNECTION");
 
         info!("connected to serial port: {}", port.as_ref());
 
@@ -274,9 +277,17 @@ impl Serial {
 
 impl Drop for Serial {
     fn drop(&mut self) {
+        println!("ATTEMPTING TO DROP PORT");
         if let Ok(mut conn_lock) = self.connection.lock() {
             if let Some(conn) = conn_lock.take() {
-                let _ = conn.disconnect();
+                let res = conn.disconnect();
+                match res {
+                    Ok(_) => {}
+                    Err(e) => {
+                        let err_msg = format!("Failed to drop the port.{e:?}");
+                        println!("{err_msg}");
+                    }
+                }
                 debug!("serial connection closed");
             }
         }
