@@ -15,7 +15,7 @@ use serialport::{DataBits, FlowControl, Parity, SerialPort, SerialPortInfo, Stop
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 /// simple serial connection that handles everything automatically
 #[derive(Clone)]
