@@ -15,7 +15,7 @@ use serialport::{DataBits, FlowControl, Parity, SerialPort, SerialPortInfo, Stop
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn, error};
 
 /// simple serial connection that handles everything automatically
 #[derive(Clone)]
@@ -88,10 +88,8 @@ impl Serial {
             .flow_control(config.flow_control)
             .timeout(config.timeout);
 
-        println!("BEFORE CONNECTION");
         let connection = SerialConnection::connect(port_builder)
             .map_err(|e| BitcoreError::SerialPort(e.into()))?;
-        println!("AFTER CONNECTION");
 
         info!("connected to serial port: {}", port.as_ref());
 
@@ -277,7 +275,6 @@ impl Serial {
 
 impl Drop for Serial {
     fn drop(&mut self) {
-        println!("ATTEMPTING TO DROP PORT");
         if let Ok(mut conn_lock) = self.connection.lock() {
             if let Some(conn) = conn_lock.take() {
                 let res = conn.disconnect();
@@ -285,7 +282,7 @@ impl Drop for Serial {
                     Ok(_) => {}
                     Err(e) => {
                         let err_msg = format!("Failed to drop the port.{e:?}");
-                        println!("{err_msg}");
+                        error!("{err_msg}");
                     }
                 }
                 debug!("serial connection closed");
