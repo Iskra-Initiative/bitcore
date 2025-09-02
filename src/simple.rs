@@ -15,9 +15,10 @@ use serialport::{DataBits, FlowControl, Parity, SerialPort, SerialPortInfo, Stop
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// simple serial connection that handles everything automatically
+#[derive(Clone)]
 pub struct Serial {
     connection: Arc<Mutex<Option<SerialConnection>>>,
     timeout: Duration,
@@ -276,7 +277,14 @@ impl Drop for Serial {
     fn drop(&mut self) {
         if let Ok(mut conn_lock) = self.connection.lock() {
             if let Some(conn) = conn_lock.take() {
-                let _ = conn.disconnect();
+                let res = conn.disconnect();
+                match res {
+                    Ok(_) => {}
+                    Err(e) => {
+                        let err_msg = format!("Failed to drop the port.{e:?}");
+                        error!("{err_msg}");
+                    }
+                }
                 debug!("serial connection closed");
             }
         }
