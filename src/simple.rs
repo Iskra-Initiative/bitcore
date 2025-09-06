@@ -163,7 +163,7 @@ impl Serial {
                         debug!("read {} bytes", bytes_read);
                         Ok(bytes_read)
                     }
-                    Err(e) => Err(BitcoreError::Io(e)),
+                    Err(e) => Err(e.into()),
                 }
             }
             None => Err(BitcoreError::NotConnected),
