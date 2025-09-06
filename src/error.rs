@@ -62,7 +62,13 @@ impl From<serialport::Error> for BitcoreError {
 
 impl From<io::Error> for BitcoreError {
     fn from(err: io::Error) -> Self {
-        BitcoreError::Io(err)
+        match err.kind() {
+            io::ErrorKind::NotConnected => BitcoreError::NotConnected,
+            io::ErrorKind::TimedOut => BitcoreError::Timeout { timeout_ms: 0 },
+            io::ErrorKind::AlreadyExists => BitcoreError::AlreadyConnected,
+            // Keep Io() for less common I/O errors like UnexpectedEof, WriteZero, etc.
+            _ => BitcoreError::Io(err),
+        }
     }
 }
 
