@@ -143,8 +143,6 @@ jobs:
         chmod +x scripts/run_socat_tests.sh
         ./scripts/run_socat_tests.sh
 
-
-
   # coverage report
   coverage:
     name: Code Coverage
@@ -283,52 +281,3 @@ jobs:
         # run tests with longer timeouts
         RUST_LOG=debug cargo test --test socat_tests test_socat_large_data_transfer -- --ignored --nocapture
       timeout-minutes: 5
-
-  # performance benchmarks
-  benchmarks:
-    name: Performance Benchmarks
-    runs-on: ubuntu-latest
-    needs: [quality, build-and-test]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libudev-dev socat
-
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: bench-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-bench-
-          ${{ runner.os }}-cargo-
-
-    - name: Run performance benchmarks
-      run: |
-        # run configuration benchmarks (no socat required)
-        cargo bench config_benches
-
-        # run core functionality benchmarks (requires socat)
-        cargo bench core_benches
-
-        # run serial benchmarks (requires socat)
-        cargo bench serial_benches
-
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-results
-        path: target/criterion/
-        retention-days: 30

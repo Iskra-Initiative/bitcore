@@ -15,8 +15,4 @@ tracing = { version = "0.1", default-features = false }
 [dev-dependencies]
 tracing-subscriber = "0.3"
 tempfile = "3.8"
-criterion = "0.6.0"
-
-[[bench]]
-name = "performance"
-harness = false
+criterion = "0.8.1"
