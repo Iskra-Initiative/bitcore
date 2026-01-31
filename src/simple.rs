@@ -271,6 +271,22 @@ impl Serial {
             .map(|conn| conn.is_some())
             .unwrap_or(false)
     }
+
+    pub fn disconnect(&self) -> Result<()> {
+        let mut conn_lock = self
+            .connection
+            .lock()
+            .map_err(|e| BitcoreError::LockFailed(e.to_string()))?;
+
+        match conn_lock.take() {
+            Some(conn) => {
+                conn.disconnect()?;
+                info!("disconnected from serial port");
+                Ok(())
+            }
+            None => Err(BitcoreError::NotConnected),
+        }
+    }
 }
 
 impl Drop for Serial {

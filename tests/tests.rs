@@ -156,4 +156,38 @@ mod unit_tests {
         let result = driver.connect("/dev/nonexistent_test_port");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_opening_and_closing_serial_connection() {
+        init_tracing();
+
+        let port_name = "/dev/ttyV0";
+        let result = Serial::new(port_name);
+        // expected to succeed
+        match result {
+            Ok(serial) => {
+                println!("Successfully opened serial port: {}", port_name);
+                // Now close the connection
+                let flush_result = serial.flush();
+
+                // write something to the port to test flush
+                let write_result = serial.write(b"test data");
+                assert!(write_result.is_ok());
+
+                // flush
+                assert!(flush_result.is_ok());
+
+                //disconnect
+                let disconnect_result = serial.disconnect();
+
+                assert!(disconnect_result.is_ok());
+                println!("Successfully disconnected serial port: {}", port_name);
+            }
+            Err(e) => {
+                println!("Failed to open serial port {}: {:?}", port_name, e);
+                // test should fail if port cannot be opened
+                assert!(false, "Could not open serial port");
+            }
+        }
+    }
 }
