@@ -34,10 +34,7 @@ impl SerialConnection {
     }
 
     pub fn connect(spbuild: SerialPortBuilder) -> io::Result<Self> {
-        let mut port = spbuild.open()?;
-
-        // flush to ensure buffer emptiness before writing
-        port.flush()?;
+        let port = spbuild.open()?;
 
         Ok(Self {
             port,
@@ -45,7 +42,9 @@ impl SerialConnection {
         })
     }
 
-    pub fn disconnect(self) -> io::Result<()> {
+    pub fn disconnect(mut self) -> io::Result<()> {
+        // flush before dropping to ensure all data is sent
+        self.port.flush()?;
         drop(self.port);
         Ok(())
     }
